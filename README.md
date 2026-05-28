@@ -1,85 +1,132 @@
-# pi05_handover
+# PI05 Handover on AgileX Nero
 
-这是一个面向 Nero + PI05 handover 的整理版代码仓库。
+This repository contains a working PI05/OpenPI handover runtime for the AgileX Nero robot arm, built on top of LeRobot async inference.
 
-仓库名改成 `pi05_handover`，但本地文件名不改，便于你后续继续对照原始目录。
+The project integrates a PI05 policy checkpoint with a real Nero arm by adding:
 
-## 包含内容
+- a LeRobot external robot adapter for Nero,
+- an AIRBOT-to-Nero end-effector pose execution path,
+- Pinocchio-based inverse kinematics through `rollio_device_nero`,
+- real-time chunking support for async inference,
+- action chunk overlap smoothing,
+- joint-space safety limiting and low-pass smoothing,
+- diagnostics for IK failures and runtime instability.
 
-- `lerobot/`：本地 LeRobot 工作副本，包含 async inference、RTC、chunk overlap 等修改
-- `lerobot_robot_nero/`：Nero 机械臂适配包、RTC policy server wrapper、调参记录
-- `pyAgxArm/`：AgileX Nero / 夹爪 SDK 副本
-- `convert_rollio_to_lerobot.py`：rollio 数据转换脚本
+The main goal of this repository is to preserve the code and engineering notes needed to reproduce the stabilized Nero handover demo.
 
-## 不包含内容
-
-为了让 GitHub 仓库更干净，这些内容不上传：
-
-- `rollio-ng/`
-- `rollio_*.deb`
-- 运行日志、缓存、`__pycache__`
-- 大量生成的测试/训练数据与二进制 fixture
-- `checkpoints/`、`output/`、`output1/`、`chunk-000/`
-- 外部依赖 wheel，例如 `rollio_device_nero-*.whl`（需要时本地单独安装）
-
-## 目录结构
+## Repository Layout
 
 ```text
 pi05_handover/
-├── README.md
-├── .gitignore
 ├── convert_rollio_to_lerobot.py
 ├── lerobot/
 ├── lerobot_robot_nero/
 └── pyAgxArm/
 ```
 
-## 推荐安装顺序
+### `lerobot/`
+
+A local LeRobot snapshot with changes for Nero async inference stability, including:
+
+- async client `must_go` handling to avoid queue starvation,
+- `smooth_overlap` action chunk aggregation,
+- PI05 async inference compatibility fixes.
+
+### `lerobot_robot_nero/`
+
+The Nero-specific LeRobot robot package.
+
+Important files:
+
+- `lerobot_robot_nero/nero.py`: observation/action interface, AIRBOT pose conversion, IK, safety clamp, joint smoothing
+- `scripts/policy_server_rtc.py`: RTC-enabled policy server wrapper
+- `scripts/preposition.py`: move Nero to the training-start pose
+- `HANDOVER_STABILIZATION_NOTES.md`: detailed debugging and stabilization record
+- `DATA_CONTRACT.md`: action/state feature contract
+
+### `pyAgxArm/`
+
+AgileX Python SDK snapshot used for Nero and gripper communication.
+
+### `convert_rollio_to_lerobot.py`
+
+Dataset conversion script for rollio-format handover data.
+
+## What Is Not Included
+
+The repository intentionally excludes runtime artifacts and large/private dependencies:
+
+- PI05 checkpoints and model weights,
+- rollio `.deb` packages,
+- `rollio_device_nero-*.whl`,
+- `rollio-ng/`,
+- generated logs and caches,
+- LeRobot test binary fixtures such as `.safetensors` and `.bag` files.
+
+These files should be installed or restored separately in the target runtime environment.
+
+## Installation
+
+The runtime was developed in a conda environment named `lerobot`.
 
 ```bash
 conda activate lerobot
-cd /home/developer/Documents/Hand_Over/pi05_handover
+cd /path/to/pi05_handover
 
 pip install -e ./lerobot
 pip install -e ./pyAgxArm
 pip install -e ./lerobot_robot_nero
 ```
 
-如果你还要用 Nero 的外部 IK/runtime wheel，请再单独安装本地的：
+Install the Nero IK/runtime wheel separately:
 
 ```bash
 pip install /path/to/rollio_device_nero-1.0.0-py3-none-any.whl
 ```
 
-## 运行方式
+Hardware assumptions:
 
-详细参数和稳定化过程，见：
+- AgileX Nero connected through `socketcan`,
+- CAN interface usually named `can0`,
+- Nero firmware `v1.11`,
+- RealSense RGB camera at `1920x1080@30`,
+- PI05 checkpoint available locally.
 
-- [Nero handover 稳定化记录](./lerobot_robot_nero/HANDOVER_STABILIZATION_NOTES.md)
-- [Nero 数据契约](./lerobot_robot_nero/DATA_CONTRACT.md)
+## Running Async Inference
 
-最常用的 async inference 流程：
+Move the robot to the training-start pose before policy execution:
 
 ```bash
 conda activate lerobot
-cd /home/developer/Documents/Hand_Over/pi05_handover
+cd /path/to/pi05_handover
 
-# 1) policy server
+python lerobot_robot_nero/scripts/preposition.py \
+  --channel can0 \
+  --use-gripper
+```
+
+Start the RTC-enabled policy server:
+
+```bash
+conda activate lerobot
+cd /path/to/pi05_handover
+
 python lerobot_robot_nero/scripts/policy_server_rtc.py \
   --host=127.0.0.1 \
   --port=8080 \
   --fps=30
 ```
 
+Start the robot client:
+
 ```bash
 conda activate lerobot
-cd /home/developer/Documents/Hand_Over/pi05_handover
+cd /path/to/pi05_handover
 
-# 2) robot client
 python -m lerobot.async_inference.robot_client \
   --server_address=127.0.0.1:8080 \
   --policy_type=pi05 \
-  --pretrained_name_or_path=/home/developer/Documents/Hand_Over/checkpoints/050000/pretrained_model \
+  --pretrained_name_or_path=/path/to/checkpoints/050000/pretrained_model \
   --policy_device=cuda \
   --client_device=cpu \
   --actions_per_chunk=50 \
@@ -103,17 +150,44 @@ python -m lerobot.async_inference.robot_client \
   --robot.joint_smoothing_alpha=0.3
 ```
 
-## 版本说明
+## Stabilization Summary
 
-这个仓库是一个“整理后的 handover 快照”，不是完整的上游镜像。
+The final stable runtime uses:
 
-我保留了手头真正要用的源代码、适配逻辑和说明文档，同时有意排除了大量运行期/测试期/安装包文件，方便你直接在 GitHub 主页展示和后续维护。
+- `actions_per_chunk=50`
+- `chunk_size_threshold=0.6`
+- `aggregate_fn_name=smooth_overlap`
+- `robot.joint_smoothing_alpha=0.3`
+- RTC-enabled policy serving
+
+Key engineering fixes:
+
+- registered Nero as a LeRobot external robot type,
+- converted PI05 end-effector pose actions into Nero joint commands through IK,
+- aligned AIRBOT-frame policy actions to Nero's Pinocchio frame,
+- changed joint delta limiting to reference the last sent command instead of delayed measured feedback,
+- held the last safe joint target on IK failure,
+- added IK diagnostics,
+- forced threshold-triggered observations through server filtering with `must_go`,
+- added smooth action chunk crossfade to reduce chunk-boundary discontinuities,
+- added joint-space low-pass filtering to reduce small residual jitter.
+
+The detailed troubleshooting record is available in:
+
+[lerobot_robot_nero/HANDOVER_STABILIZATION_NOTES.md](./lerobot_robot_nero/HANDOVER_STABILIZATION_NOTES.md)
+
+## Notes
+
+This repository is a reproducible project snapshot rather than a clean upstream fork. It is intended to document and preserve the complete handover runtime used during development.
+
+The upstream codebases are included as source snapshots so the Nero-specific changes can be inspected and reproduced without relying on external branches.
 
 ## Attribution
 
-本仓库包含并修改了以下第三方/上游项目的代码快照：
+This repository includes modified source snapshots from:
 
-- LeRobot: `lerobot/`，原项目为 Hugging Face LeRobot，许可见 `lerobot/LICENSE`
-- pyAgxArm: `pyAgxArm/`，原项目为 AgileX Robotics pyAgxArm，许可见 `pyAgxArm/LICENSE`
+- Hugging Face LeRobot, under the license in `lerobot/LICENSE`
+- AgileX Robotics pyAgxArm, under the license in `pyAgxArm/LICENSE`
 
-本项目的核心工作集中在 Nero robot adapter、PI05 async inference runtime、RTC policy server wrapper、action chunk overlap 稳定化、IK 安全执行链路和 handover 调参记录。
+The Nero adapter, RTC server wrapper, stabilization changes, and handover runtime notes are project-specific additions.
+
