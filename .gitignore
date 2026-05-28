@@ -1,0 +1,33 @@
+# Python and editor noise
+**/__pycache__/
+**/.pytest_cache/
+**/.ruff_cache/
+**/.mypy_cache/
+**/.venv/
+**/venv/
+**/*.py[cod]
+**/*.pyo
+**/*.log
+**/logs/
+**/*.egg-info/
+*.DS_Store
+
+# Large generated data / packages
+**/*.deb
+**/*.whl
+**/*.bag
+**/*.safetensors
+**/*.pt
+**/*.pth
+**/*.ckpt
+**/*.bin
+
+# Explicitly keep the handover snapshot lean
+lerobot/tests/artifacts/
+rollio-ng/
+rollio-logs/
+checkpoints/
+output/
+output1/
+chunk-000/
+

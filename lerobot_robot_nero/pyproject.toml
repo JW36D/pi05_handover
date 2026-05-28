@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lerobot_robot_nero"
+version = "0.1.0"
+description = "Minimal LeRobot adapter package for AgileX Nero using pyAgxArm."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "lerobot_robot_nero contributors" }]
+dependencies = [
+  "numpy>=1.24",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8.0.0"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
