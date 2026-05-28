@@ -16,7 +16,7 @@ The main goal of this repository is to preserve the code and engineering notes n
 
 ## Demo
 
-<video src="./demo_handover.mp4" controls width="420"></video>
+![Demo](./demo_handover.gif)
 
 [Download demo video](./demo_handover.mp4)
 
@@ -24,6 +24,7 @@ The main goal of this repository is to preserve the code and engineering notes n
 
 ```text
 pi05_handover/
+├── demo_handover.gif
 ├── demo_handover.mp4
 ├── convert_rollio_to_lerobot.py
 ├── lerobot/
