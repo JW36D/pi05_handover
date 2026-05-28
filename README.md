@@ -14,10 +14,17 @@ The project integrates a PI05 policy checkpoint with a real Nero arm by adding:
 
 The main goal of this repository is to preserve the code and engineering notes needed to reproduce the stabilized Nero handover demo.
 
+## Demo
+
+<video src="./demo_handover.mp4" controls width="420"></video>
+
+[Download demo video](./demo_handover.mp4)
+
 ## Repository Layout
 
 ```text
 pi05_handover/
+├── demo_handover.mp4
 ├── convert_rollio_to_lerobot.py
 ├── lerobot/
 ├── lerobot_robot_nero/
@@ -190,4 +197,3 @@ This repository includes modified source snapshots from:
 - AgileX Robotics pyAgxArm, under the license in `pyAgxArm/LICENSE`
 
 The Nero adapter, RTC server wrapper, stabilization changes, and handover runtime notes are project-specific additions.
-
